@@ -4,7 +4,7 @@ Herramienta en Python para desplegar laboratorios virtuales de redes inalámbric
 
 ## 🚀 Características
 * Creación dinámica de interfaces virtuales mediante `mac80211_hwsim`.
-* Despliegue automático de Puntos de Acceso simulados usando `hostapd`.
+* Despliegue automático de puntos de acceso simulados usando `hostapd`.
 * Limpieza integral del entorno al finalizar la ejecución.
 
 ## 🛠️ Uso
