@@ -10,7 +10,7 @@ Herramienta en Python para desplegar laboratorios virtuales de redes inalámbric
 ## 🛠️ Uso
 ```bash
 # Clonar repositorio
-git clone [https://github.com/tu-usuario/wifi-lab-builder.git](https://github.com/tu-usuario/wifi-lab-builder.git)
+git clone [https://github.com/numial/wifi-lab-builder.git](https://github.com/numial/wifi-lab-builder.git)
 cd wifi-lab-builder
 
 #Antes de ejecutar nada
