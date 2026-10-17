@@ -24,6 +24,8 @@ def check_root():
 def setup_hwsim(num_radios=3):
     """Carga el módulo mac80211_hwsim y prepara las interfaces."""
     print(f"[*] Cargando módulo mac80211_hwsim con {num_radios} radios virtuales...")
+    #Para NetworkManager para evitar problemas al iniciar script
+    subprocess.run(["systemctl", "stop", "NetworkManager"], stderr=subprocess.DEVNULL)
     
     # Eliminar módulo previo si estaba cargado
     subprocess.run(["modprobe", "-r", "mac80211_hwsim"], stderr=subprocess.DEVNULL)
