@@ -16,6 +16,7 @@ cd wifi-lab-builder
 #Antes de ejecutar nada
 sudo apt update
 sudo apt install -y hostapd dnsmasq iw wireless-tools
+chmod +x wifi-lab.py
 
 # Ejecutar laboratorio predeterminado
 sudo python3 wifi_lab.py --ssid "MiRedVirtual" --passphrase "Password123!"
