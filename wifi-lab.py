@@ -22,14 +22,19 @@ def check_root():
 
 
 def setup_hwsim(num_radios=3):
-    """Carga el módulo del kernel mac80211_hwsim para crear las interfaces virtuales."""
+    """Carga el módulo mac80211_hwsim y prepara las interfaces."""
     print(f"[*] Cargando módulo mac80211_hwsim con {num_radios} radios virtuales...")
     
+    # Eliminar módulo previo si estaba cargado
     subprocess.run(["modprobe", "-r", "mac80211_hwsim"], stderr=subprocess.DEVNULL)
     result = subprocess.run(["modprobe", "mac80211_hwsim", f"radios={num_radios}"], capture_output=True, text=True)
     
     if result.returncode == 0:
         print("[+] Interfaces inalámbricas virtuales creadas correctamente.")
+        # Evitar interferencias de NetworkManager y activar interfaces al instante
+        for i in range(num_radios):
+            subprocess.run(["nmcli", "device", "set", f"wlan{i}", "managed", "no"], stderr=subprocess.DEVNULL)
+            subprocess.run(["ip", "link", "set", f"wlan{i}", "up"], stderr=subprocess.DEVNULL)
     else:
         print(f"[!] Error cargando el módulo del kernel: {result.stderr}")
         sys.exit(1)
