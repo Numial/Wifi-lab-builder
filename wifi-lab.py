@@ -52,7 +52,7 @@ def teardown():
     
     if os.path.exists(TEMP_DIR):
         subprocess.run(["rm", "-rf", TEMP_DIR])
-        
+    subprocess.run(["systemctl", "start", "NetworkManager"], stderr=subprocess.DEVNULL)    
     print("[+] Entorno restaurado al estado original.")
 
 
