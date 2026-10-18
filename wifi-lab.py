@@ -7,6 +7,7 @@ Crea interfaces virtuales utilizando mac80211_hwsim para simular redes Wi-Fi en 
 import os
 import sys
 import time
+import random
 import subprocess
 import argparse
 
@@ -21,21 +22,36 @@ def check_root():
         sys.exit(1)
 
 
+def generate_random_mac():
+    """Genera una dirección MAC aleatoria válida (Unicast & Locally Administered)."""
+    first_byte = random.choice([0x02, 0x06, 0x0A, 0x0E])
+    mac = [first_byte] + [random.randint(0x00, 0xFF) for _ in range(5)]
+    return ":".join(f"{b:02x}" for b in mac)
+
+
+def set_interface_mac(iface, mac_address):
+    """Cambia la dirección MAC de una interfaz de red."""
+    subprocess.run(["ip", "link", "set", iface, "down"], stderr=subprocess.DEVNULL)
+    result = subprocess.run(["ip", "link", "set", iface, "address", mac_address], capture_output=True, text=True)
+    subprocess.run(["ip", "link", "set", iface, "up"], stderr=subprocess.DEVNULL)
+    if result.returncode == 0:
+        print(f"[+] Dirección MAC de {iface} configurada a: {mac_address}")
+    else:
+        print(f"[!] Error al cambiar la MAC de {iface}: {result.stderr.strip()}")
+
+
 def setup_hwsim(num_radios=3):
     """Carga el módulo mac80211_hwsim y prepara las interfaces."""
-    print(f"[*] Cargando módulo mac80211_hwsim con {num_radios} radios virtuales...")
-    #Para NetworkManager para evitar problemas al iniciar script
+    print("[*] Deteniendo NetworkManager para evitar interferencias...")
     subprocess.run(["systemctl", "stop", "NetworkManager"], stderr=subprocess.DEVNULL)
     
-    # Eliminar módulo previo si estaba cargado
+    print(f"[*] Cargando módulo mac80211_hwsim con {num_radios} radios virtuales...")
     subprocess.run(["modprobe", "-r", "mac80211_hwsim"], stderr=subprocess.DEVNULL)
     result = subprocess.run(["modprobe", "mac80211_hwsim", f"radios={num_radios}"], capture_output=True, text=True)
     
     if result.returncode == 0:
         print("[+] Interfaces inalámbricas virtuales creadas correctamente.")
-        # Evitar interferencias de NetworkManager y activar interfaces al instante
         for i in range(num_radios):
-            subprocess.run(["nmcli", "device", "set", f"wlan{i}", "managed", "no"], stderr=subprocess.DEVNULL)
             subprocess.run(["ip", "link", "set", f"wlan{i}", "up"], stderr=subprocess.DEVNULL)
     else:
         print(f"[!] Error cargando el módulo del kernel: {result.stderr}")
@@ -43,7 +59,7 @@ def setup_hwsim(num_radios=3):
 
 
 def teardown():
-    """Limpia el entorno, detiene servicios y elimina el módulo virtual."""
+    """Limpia el entorno, detiene servicios y restaura NetworkManager."""
     print("\n[*] Limpiando el laboratorio...")
     
     subprocess.run(["pkill", "-f", "hostapd"], stderr=subprocess.DEVNULL)
@@ -52,21 +68,25 @@ def teardown():
     
     if os.path.exists(TEMP_DIR):
         subprocess.run(["rm", "-rf", TEMP_DIR])
-    subprocess.run(["systemctl", "start", "NetworkManager"], stderr=subprocess.DEVNULL)    
+        
+    print("[*] Reactivando NetworkManager...")
+    subprocess.run(["systemctl", "start", "NetworkManager"], stderr=subprocess.DEVNULL)
     print("[+] Entorno restaurado al estado original.")
 
 
-def create_hostapd_config(iface="wlan0", ssid="Lab_WiFi_Test", channel=6, passphrase=None):
-    """Genera el archivo de configuración para hostapd."""
+def create_hostapd_config(iface="wlan0", ssid="Lab_WiFi_Test", channel=6, passphrase=None, bssid=None):
+    """Genera el archivo de configuración para hostapd con BSSID opcional."""
     os.makedirs(TEMP_DIR, exist_ok=True)
     config_path = os.path.join(TEMP_DIR, "hostapd.conf")
+    
+    bssid_line = f"bssid={bssid}\n" if bssid else ""
     
     config_content = f"""interface={iface}
 driver=nl80211
 ssid={ssid}
 hw_mode=g
 channel={channel}
-macaddr_acl=0
+{bssid_line}macaddr_acl=0
 auth_algs=1
 ignore_broadcast_ssid=0
 """
@@ -84,9 +104,9 @@ rsn_pairwise=CCMP
     return config_path
 
 
-def start_ap(iface, ssid, channel, passphrase):
+def start_ap(iface, ssid, channel, passphrase, bssid=None):
     """Inicia el punto de acceso con hostapd."""
-    config_path = create_hostapd_config(iface, ssid, channel, passphrase)
+    config_path = create_hostapd_config(iface, ssid, channel, passphrase, bssid)
     print(f"[*] Iniciando AP '{ssid}' en interfaz {iface} (Canal {channel})...")
     
     proc = subprocess.Popen(
@@ -100,7 +120,7 @@ def start_ap(iface, ssid, channel, passphrase):
         print(f"[+] Punto de acceso activo (PID: {proc.pid}).")
         return proc
     else:
-        print("[!] Error al iniciar hostapd. Verifica que hostapd esté instalado y que la interfaz esté libre.")
+        print("[!] Error al iniciar hostapd. Verifica que hostapd esté instalado y la interfaz libre.")
         return None
 
 
@@ -138,13 +158,29 @@ def main():
     parser.add_argument("--passphrase", type=str, default="Laboratorio123!", help="Contraseña WPA2 para la red virtual")
     parser.add_argument("--ap-iface", type=str, default="wlan0", help="Interfaz asignada al AP")
     parser.add_argument("--client-iface", type=str, default="wlan1", help="Interfaz asignada al cliente virtual")
+    parser.add_argument("--random-mac", action="store_true", help="Aleatorizar BSSID (AP) y MAC del cliente")
+    parser.add_argument("--bssid", type=str, default=None, help="BSSID (MAC del AP) personalizado")
+    parser.add_argument("--client-mac", type=str, default=None, help="MAC del cliente personalizada")
     args = parser.parse_args()
 
     check_root()
 
     try:
         setup_hwsim(num_radios=args.radios)
-        ap_proc = start_ap(args.ap_iface, args.ssid, 6, args.passphrase)
+        
+        ap_mac = args.bssid
+        client_mac = args.client_mac
+
+        if args.random_mac:
+            ap_mac = generate_random_mac()
+            client_mac = generate_random_mac()
+
+        if ap_mac:
+            set_interface_mac(args.ap_iface, ap_mac)
+        if client_mac:
+            set_interface_mac(args.client_iface, client_mac)
+
+        ap_proc = start_ap(args.ap_iface, args.ssid, 6, args.passphrase, bssid=ap_mac)
         
         if ap_proc:
             time.sleep(1)
@@ -156,7 +192,7 @@ def main():
             print(f"  - Punto de Acceso (AP): {args.ap_iface}")
             print(f"  - Cliente Virtual:      {args.client_iface}")
             print(f"  - SSID:                 {args.ssid}")
-            print(f"  - Interfaz libre para pruebas: wlan2")
+            print(f"  - Interfaz para pruebas: wlan2")
             print("\n  Presiona Ctrl+C para detener y limpiar el entorno.")
             print("="*50 + "\n")
             
