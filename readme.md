@@ -93,7 +93,7 @@ Customize the laboratory setup using CLI flags:
 | `--passphrase` | `str` | `Laboratorio123!` | WPA2-PSK passphrase for authentication |
 | `--ap-iface` | `str` | `wlan0` | Virtual interface assigned to the Access Point |
 | `--client-iface`| `str` | `wlan1` | Virtual interface assigned to the connected Client |
-| `--random-mac`| `` | `` | Generate a random MAC address |
+| `--random-mac`|  |  | Generate a random MAC address |
 
 
 #### Example Custom Deployment:
