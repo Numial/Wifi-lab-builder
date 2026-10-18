@@ -124,7 +124,3 @@ sudo aireplay-ng -0 2 -a <AP_MAC_ADDRESS> -c <CLIENT_MAC_ADDRESS> wlan2
 ```
 
 ---
-
-## 📜 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
